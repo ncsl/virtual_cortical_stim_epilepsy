@@ -1,0 +1,71 @@
+import os
+import sys
+sys.path.append('../../../')
+sys.path.append('../../../../')
+from cortstim.pipeline.utils.utils import pair_name_to_resultfiles
+
+"""
+A snakemake file for running models of all the data.
+
+snakemake --dag | dot -Tpdf > dag_models_pipeline.pdf
+
+1. output
+    - fragility
+        - <center>
+    - freq
+        - <center>
+"""
+
+configfile: "config.yaml"
+
+# define end output directories
+rawdata_dir = os.path.join(config['rawdatadir'],
+                           config['center'])
+#
+model_results_dir = os.path.join(config['outputdatadir'],
+                                         "ltvn",
+                                         config['reference'],
+                                         config['modality'],
+                                         config['center'])
+
+output_results_dir = os.path.join(config['outputdatadir'],
+                                         config['modelname'],
+                                         config['reference'],
+                                         config['modality'],
+                                         config['center'])
+
+# get dictionary of all fif infiles -> to their endpoint filenames
+fif_infiles_dict_json = pair_name_to_resultfiles(config, model_results_dir)
+print(fif_infiles_dict_json)
+
+# First rule
+rule all:
+    input:
+        outputfilepath = expand(os.path.join(output_results_dir,
+                                      "{datasetname}_impulse_responses.npz"),
+                                    datasetname=fif_infiles_dict_json.values()),
+    shell:
+        "echo 'done';"
+
+# Run impulse model
+rule impulse_model:
+    input:
+        resultstruct_file = os.path.join(model_results_dir,
+                                         "{datasetname}_ltvnmodel.npz"),
+    params:
+        resultsdir = model_results_dir,
+        resultjson_file = os.path.join(model_results_dir,
+                                  "{datasetname}_ltvnmodel.json"),
+        modality = config['modality'],
+        reference = config['reference']
+    output:
+        outputfilepath = os.path.join(output_results_dir,
+                                      "{datasetname}_impulse_responses.npz"),
+        outputjsonfilepath = os.path.join(output_results_dir,
+                                        "{datasetname}_impulse_responses.json")
+    shell:
+        "echo 'Running impulse models rule...';"
+        "python ./run_impulse.py {params.resultsdir} " \
+                            "{params.resultjson_file} " \
+                            "{output.outputfilepath} " \
+                            "{output.outputjsonfilepath};"

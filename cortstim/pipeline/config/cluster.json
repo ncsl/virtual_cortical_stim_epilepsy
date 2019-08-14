@@ -1,0 +1,52 @@
+{
+    "__default__":
+    {
+        "account": "ali39@jhu.edu",
+        "partition": "shared",
+        "nodes": "1",
+        "time": "3:30:0",
+        "ntasks-per-node":"1",
+        "cpus-per-task":"1",
+        "jobname": "new_fragility_analysis",
+        "output": "./logs/{rule}.{wildcards}_%a.out",
+        "error": "./logs/{rule}.{wildcards}_%a.err",
+        "array": "1-1",
+        "mem": "5000"
+    },
+    "impulse_model":
+    {
+        "time": "10:00:0",
+        "partition": "lrgmem",
+        "cpus-per-task":"3",
+        "array": "1-1",
+        "jobname": "{wildcards.datasetname}_new_impulse_analysis"
+    },
+    "fragility_model":
+    {
+        "time": "4:00:0",
+        "partition": "shared",
+        "array": "1-48",
+        "mem": "5000",
+        "jobname": "{wildcards.datasetname}_new_fragility_analysis"
+    },
+    "merge_models":
+    {
+        "time": "0:30:0",
+        "jobname": "{wildcards.datasetname}_new_fragility_merge",
+        "array":"1-1"
+    },
+    "plot_fragility_results":
+    {
+        "time": "0:30:0",
+        "jobname": "{wildcards.datasetname}_plot_map",
+        "array": "1-1"
+    },
+    "eznet_train":
+    {
+        "partition": "gpu",
+        "ntasks-per-node": "6",
+        "jobname": "eznet_training",
+        "array":"1-1",
+        "time": "2:00:0"
+    }
+}

@@ -1,0 +1,14 @@
+# define directories that we work with
+rawdatadir:
+  "/home/adam2392/hdd2/data/rawdata/"
+#  "/Users/adam2392/Downloads/tngpipeline/"
+outputdatadir:
+  "/home/adam2392/hdd/data/processed/output_new/"
+#  "/Users/adam2392/Downloads/output_new/"
+clinicalmetadatadir:
+#  "/Users/adam2392/Dropbox/phd_research/Fragility_Analysis_Project/"
+  "/home/adam2392/Documents/Dropbox/phd_research/Fragility_Analysis_Project/"
+center:
+  "umf"
+modality:
+  "ieeg"

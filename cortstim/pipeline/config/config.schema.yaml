@@ -1,0 +1,17 @@
+schema: ""
+description: An experimental configuration sheet
+properties:
+  sample:
+    type: string
+    description: sample name/identifier
+  condition:
+    type: string
+    description: sample condition
+  case:
+    type: boolean
+    default: true
+    description: boolean to indicate control or not
+
+required:
+  - sample
+  - condition

@@ -1,0 +1,89 @@
+import os
+import sys
+sys.path.append('../../../')
+sys.path.append('../../../../')
+from cortstim.pipeline.utils.utils import pair_name_to_infiles
+
+"""
+A snakemake file for running models of all the data.
+
+snakemake --dag | dot -Tpdf > dag_models_pipeline.pdf
+
+1. output
+    - ltvnility
+        - <center>
+    - freq
+        - <center>
+"""
+
+configfile: "../config.yaml"
+
+# get dictionary of all fif infiles -> to their endpoint filenames
+fif_infiles_dict_json = pair_name_to_infiles(config, ignore_ictal=False, ignore_interictal=False)
+
+# print(fif_infiles_dict_json)
+
+# define end output directories
+rawdata_dir = os.path.join(config['rawdatadir'],
+                           config['center'])
+output_dir = os.path.join(config['outputdatadir'],
+                                         "ltvn",
+                                         config['reference'],
+                                         config['modality'],
+                                         config['center'])
+
+# First rule
+rule all:
+    input:
+        result_heatmap=expand(os.path.join(output_dir,
+                                         "{datasetname}_ltvnmodel.npz"),
+                                    datasetname=fif_infiles_dict_json.keys()),
+    shell:
+        "echo 'done';"
+
+
+# Build Entire ltvnility Model At Once
+rule ltvn_model:
+    params:
+        rawdatajson = "{datasetname}.json",
+        root_dir = rawdata_dir,
+        tempdatadir = os.path.join(config['tempdatadir'],
+                                   "{datasetname}"),
+        outputfilepath = os.path.join(output_dir,
+                            "{datasetname}_ltvnmodel.npz"),
+        outputmetafilepath = os.path.join(output_dir,
+                                  "{datasetname}_ltvnmodel.json"),
+        modality=config['modality'],
+        reference=config['reference']
+    output:
+        output_success_file = temp(os.path.join(config['tempdatadir'],
+                                           "{datasetname}_ltvn_success.txt")),
+    shell:
+        "echo 'Running ltvnility models rule...';" \
+        "python ./run_ltvn.py {params.root_dir} " \
+                            "{params.rawdatajson} " \
+                            "{params.outputfilepath} " \
+                            "{params.outputmetafilepath} " \
+                            "{params.tempdatadir} " \
+                            "{params.modality} " \
+                            "{params.reference}; "
+        "python ../check_finish.py {params.outputmetafilepath} {output.output_success_file} {params.tempdatadir};"
+
+# rule to merge models that are computed window by window
+rule merge_models:
+    input:
+        output_success_file = os.path.join(config['tempdatadir'],
+                                           "{datasetname}_ltvn_success.txt"),
+    params:
+        tempdatadir = os.path.join(config['tempdatadir'],
+                                   "{datasetname}"),
+        resultjson_file = os.path.join(output_dir,
+                               "{datasetname}_ltvnmodel.json")
+    output:
+        resultstruct_file = protected(os.path.join(output_dir,
+                                         "{datasetname}_ltvnmodel.npz")),
+    shell:
+        "echo 'Running merge models rule...'; " \
+        "python ./run_mergemodels.py {output.resultstruct_file} " \
+                                    "{params.resultjson_file} " \
+                                    "{params.tempdatadir}"

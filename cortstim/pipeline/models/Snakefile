@@ -1,0 +1,134 @@
+import sys
+sys.path.append("../../../")
+sys.path.append("../../../../")
+import snakemake
+import os
+from cortstim.pipeline.utils.utils import pair_name_to_infiles
+
+"""
+A snakemake file for running models of all the data.
+
+snakemake --dag | dot -Tpdf > dag_models_pipeline.pdf
+
+1. output
+    - fragility
+        - <center>
+    - freq
+        - <center>
+"""
+
+configfile: "clusterconfig.yaml"
+snakemake.utils.validate(config, "../config/analysis_config.schema.yaml")
+
+# get dictionary of all fif infiles -> to their endpoint filenames
+fif_infiles_dict_json = pair_name_to_infiles(config, ignore_ictal=False, ignore_interictal=False)
+print(fif_infiles_dict_json, flush=True)
+
+# define which rules are local, and which are cluster friendly
+localrules: all, clean
+
+# define end output directories
+rawdata_dir = os.path.join(config['rawdatadir'],
+                           config['center'])
+
+output_dir = os.path.join(config['outputdatadir'],
+                                         "impulse",
+                                         config['reference'],
+                                         config['modality'],
+                                         config['center'])
+
+# First rule
+rule all:
+    input:
+        result_heatmap=expand(os.path.join(fragility_output_dir,
+                                         "{datasetname}_fragmodel.npz"),
+                                    datasetname=fif_infiles_dict_json.keys()),
+    shell:
+        "echo 'done';"
+
+
+# Build Entire Fragility Model At Once
+rule fragility_model:
+    params:
+        rawdatajson = "{datasetname}.json",
+        root_dir = rawdata_dir,
+        tempdatadir = os.path.join(config['tempdatadir'],
+                                   config['reference'],
+                                   "{datasetname}"),
+        outputfilepath = os.path.join(fragility_output_dir,
+                            "{datasetname}_fragmodel.npz"),
+        outputmetafilepath = os.path.join(fragility_output_dir,
+                                  "{datasetname}_frag.json"),
+        modality=config['modality'],
+        reference=config['reference'],
+        # logfile="logs/cluster/gnu_parallel_{datasetname}.log",
+        # parallel="'parallel --delay .2 -j 24 --joblog logs/cluster/gnu_parallel_{datasetname}.log --resume '",
+    output:
+        output_success_file = os.path.join(config['tempdatadir'],
+                                           config['reference'],
+                                           "{datasetname}_frag_success.txt")
+    shell:
+        "echo 'Running fragility models rule...';"
+        "echo {params};"
+        "python ./ltvn/run_ltvn.py {params.root_dir} " \
+                            "{params.rawdatajson} " \
+                            "{params.outputfilepath} " \
+                            "{params.outputmetafilepath} " \
+                            "{params.tempdatadir} " \
+                            "{params.modality} " \
+                            "{params.reference}; "
+        "python ./check_finish.py {params.outputmetafilepath} {output.output_success_file} {params.tempdatadir};"
+
+# rule to merge models that are computed window by window
+rule merge_models:
+    input:
+        output_success_file = os.path.join(config['tempdatadir'],
+                                           config['reference'],
+                                   "{datasetname}_frag_success.txt")
+    params:
+        tempdatadir = os.path.join(config['tempdatadir'],
+                                   config['reference'],
+                                   "{datasetname}"),
+        resultjson_file = os.path.join(fragility_output_dir,
+                               "{datasetname}_frag.json")
+    output:
+        resultstruct_file = os.path.join(fragility_output_dir,
+                                         "{datasetname}_fragmodel.npz"),
+    shell:
+        "echo 'Running merge models rule...'; " \
+        "python ./ltvn/run_mergemodels.py {output.resultstruct_file} " \
+                                    "{params.resultjson_file} " \
+                                    "{params.tempdatadir}"
+
+
+# DELETE everything, so we can re-run things
+rule clean:
+    params:
+        tempdatadir = os.path.join(config['tempdatadir'])
+    shell:
+        "rm {params.tempdatadir}/*_success.txt"
+
+rule soft_clean_patient:
+    params:
+        patient = config['softclean_patient'],
+        tempdatadir = config['tempdatadir'],
+        outputplotsdir = fragility_output_plots_dir,
+        outputdatadir = fragility_output_dir
+    shell:
+        "rm {params.outputplotsdir}/{params.patient}*;" \
+        "rm {params.outputdatadir}/{params.patient}*.npz;" \
+        "rm {params.tempdatadir}/{params.patient}*_success.txt;" \
+        "rm {params.tempdatadir}/{params.patient}*/temp_0.npz;"
+
+
+rule soft_clean_center:
+    params:
+        center = config['softclean_center'],
+        tempdatadir = config['tempdatadir'],
+        outputplotsdir = fragility_output_plots_dir,
+        outputdatadir = fragility_output_dir
+    shell:
+        "rm {params.outputplotsdir}/{params.center}*;" \
+        "rm {params.outputdatadir}/{params.center}*.npz;" \
+        "rm {params.tempdatadir}/{params.center}*_success.txt;" \
+        "rm {params.tempdatadir}/{params.center}*/temp_0.npz;"

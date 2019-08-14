@@ -1,0 +1,27 @@
+$schema: ""
+description: An experimental configuration sheet for running analysis
+properties:
+  rawdatadir:
+    type: string
+    description: directory of patients with predefined format
+  tempdatadir:
+    type: string
+    description: a directory to store temporary computed data before merging into one
+  outputdatadir:
+    type: string
+    description: directory to save the analyzed data
+  outputplotsdir:
+    type: string
+    description: directory to save the output plots to.
+  centers:
+    type: array
+    description: list of centers subdirectory of rawdatadir to analyze
+  patient:
+    type: string
+    description: (optional) patient to run within this directory only
+
+required:
+  - rawdatadir
+  - outputdatadir
+  - outputplotsdir
+  - tempdatadir

@@ -1,0 +1,19 @@
+# define directories that we work with
+rawdatadir:
+  "/scratch/users/ali39@jhu.edu/data/epilepsy_raw/"
+tempdatadir:
+  "/scratch/users/ali39@jhu.edu/data/processed/_temp/"
+outputdatadir:
+  "/scratch/users/ali39@jhu.edu/data/processed/output_new/"
+outputplotsdir:
+  "/scratch/users/ali39@jhu.edu/data/figures/"
+center:
+  "clevelandnl"
+modality:
+  "ieeg"
+reference:
+  "monopolar"
+softclean_patient:
+  "la01"
+softclean_center:
+  "cleveland"

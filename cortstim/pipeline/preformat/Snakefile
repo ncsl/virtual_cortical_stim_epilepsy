@@ -1,0 +1,156 @@
+import os
+import sys
+
+sys.path.append('../../../')
+
+from cortstim.pipeline.utils.utils import pair_name_edffiles
+
+"""
+A snakemake file for preformatting the all data.
+
+snakemake --dag | dot -Tpdf > dag_preformat_pipeline.pdf
+
+Runs tests to ensure data is all in the corresponding format:
+
+1. patient
+    - mri
+    - ct
+    - dti (optional)
+    - tvb
+    - seeg
+        - edf
+        - fif
+
+Fif files will be created from the edf files.
+"""
+
+configfile: "config.yaml"
+
+# get dictionary of all edf infiles (key==fif_output_path, value==edf_filepath)
+edf_infiles_dict = pair_name_edffiles(config, ignore_ictal=False, ignore_interictal=True)
+
+print(edf_infiles_dict)
+print(len(edf_infiles_dict))
+
+# define end output directories
+rawdata_dir = os.path.join(config['rawdatadir'],
+                           config['center'])
+
+hdf_outputdir = os.path.join(config['rawdatadir'],
+                             config['center'])
+
+modality = config['modality']
+
+# First rule
+rule all:
+    input:
+        tempsuccessfile = expand("{datasetpath}_success_preformat.txt", datasetpath=sorted(edf_infiles_dict.keys())),
+        # tempsuccessfile = expand("{datasetpath}_success_wm.txt", datasetpath=edf_infiles_dict.keys()),
+    shell:
+        "echo 'done'"
+
+rule format_clinicaldf:
+    input:
+        rawexceldatafilepath = os.path.join(config['clinicalmetadatadir'],
+                                         "organized_clinical_datasheet_raw.xlsx"),
+    params:
+        exceldatafilepath = os.path.join(config['clinicalmetadatadir'],
+                                         "organized_clinical_datasheet_formatted.xlsx"),
+    output:
+        exceldatafilepath = os.path.join(config['clinicalmetadatadir'],
+                                         "organized_clinical_datasheet_formatted.xlsx"),
+    shell:
+        "python ./run_clinicalformat.py " \
+                            "{input.rawexceldatafilepath} " \
+                            "{params.exceldatafilepath};"
+
+rule preformat_edf_into_fif:
+    input:
+        exceldatafilepath = os.path.join(config['clinicalmetadatadir'],
+                                         "organized_clinical_datasheet_formatted.xlsx"),
+    params:
+        input_edf_filepath = lambda wildcards: edf_infiles_dict[wildcards.datasetpath],
+        rawdatadir = config['rawdatadir'],
+        outputfilepath="{datasetpath}",
+        modality = modality
+    output:
+        outfile = temp("{datasetpath}_success_preformat.txt"),
+    shell:
+        "echo {params}; "\
+        "python ./run_preformat.py " \
+                        "{params.rawdatadir} " \
+                        "{params.input_edf_filepath} "\
+                        "{params.outputfilepath} "\
+                        "{params.modality};"
+        "python ./run_clinicalsync.py " \
+                        "{params.rawdatadir} " \
+                        "{params.outputfilepath} " \
+                        "{params.modality} " \
+                        "{input.exceldatafilepath}; "
+        "touch {output.outfile};"
+
+
+rule merge_wmandout_contacts_intofif:
+    input:
+        # input dataset fif filepath
+        # input_fiffilepath = "{datasetpath}",
+        input_succ_file = "{datasetpath}_success_preformat.txt",
+    params:
+        fiffilepath = "{datasetpath}",
+        # input excel layout file for all seeg electrodes
+        wmexceldatafilename = "electrode_layout.xlsx",
+    output:
+        # temporary success file flag
+        outfile = temp("{datasetpath}_success_wm.txt"),
+    shell:
+        "echo {params}; "\
+        "echo 'RUNNING WM SYNC.';"
+        "python ./run_wmdatasync.py " \
+                        "{params.fiffilepath} " \
+                        "{params.wmexceldatafilename}; "
+        "touch {output.outfile};"
+
+rule save_rawdata_asmat:
+    input:
+        # input dataset fif filepath
+        jsonfilepath = "{datasetpath}",
+        # input_succ_file = "{datasetpath}_success_preformat.txt",
+    params:
+        rawdatadir = config['rawdatadir'],
+        outputfilepath = "{datasetpath}",
+        modality = modality,
+        exceldatafilepath = os.path.join(config['clinicalmetadatadir'],
+                                         "organized_clinical_datasheet_formatted.xlsx"),
+    output:
+        # temporary success file flag
+        outfile = "{datasetpath}.mat",
+    shell:
+        "echo {params}; "\
+        "python ./run_preformat_asmat.py " \
+                    "{params.rawdatadir} " \
+                    "{params.jsonfilepath} " \
+                    "{params.modality} " \
+                    "{input.exceldatafilepath}; "
+
+# rule combine_edf_into_fif:
+#     params:
+#         desired_output_filepath = os.path.join(config['rawdatadir'], "{patient}", "seeg", "fif", "jsonfile.test"),
+#         rawdatadir = config['rawdatadir'],
+#         input_edf_filepath = "test"
+#     output:
+#         os.path.join(config['rawdatadir'], "{patient}", "seeg", "fif")
+#     shell:
+#         "python ./run_pretest_datasets.py {params.rawdatadir} {params.input_edf_filepath} {params.desired_output_filepath}"
+        # " --patient {patient}"
+
+# DELETE everything, so we can re-run things
+rule clean:
+    params:
+        rawdatadir = rawdata_dir,
+        datatype = modality
+    # run:
+    #     print(input[0])
+    #     print(input[0]+'/*/seeg/fif/')
+    shell:
+        # 'ls {input[0]}/{pat}/seeg/fif/'
+        'rm -rf {params.rawdatadir}/*/{params.datatype}/fif/'

@@ -1,0 +1,23 @@
+# define directories that we work with
+rawdatadir:
+  "/home/adam2392/hdd2/data/rawdata/"
+#  "/Users/adam2392/Downloads/tngpipeline/"
+tempdatadir:
+  "/home/adam2392/hdd/data/processed/_temp"
+#  "/Users/adam2392/Downloads/_temp"
+outputdatadir:
+  "/home/adam2392/hdd/data/processed/output_new/"
+#  "/Users/adam2392/Downloads/output_new/"
+outputplotsdir:
+  "/home/adam2392/hdd/figures/"
+#   "/Users/adam2392/Downloads/figures/"
+center:
+  "clevelandnl"
+modality:
+  "ieeg"
+reference:
+  "common_avg"
+softclean_patient:
+  "ummc008"
+softclean_center:
+  "cleveland"
