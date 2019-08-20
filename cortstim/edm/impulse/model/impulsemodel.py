@@ -1,7 +1,53 @@
 import numpy as np
-
+import numpy.matlib as nmb
 import scipy.signal
-from tqdm import trange
+# from tqdm import trange
+
+
+class NormalizedModel(object):
+    @staticmethod
+    def compute_fragilitymetric(minnormpertmat):
+        """
+        Function to perform column normalization of a matrix that computes:
+
+        a_ij = (max_in_col(a) - a_ij) / max_in_col(a)
+
+        :param minnormpertmat: (np.ndarray) a NxW matrix
+        :return: (np.ndarray) normalized NxW matrix
+        """
+        # get dimensions of the pert matrix
+        N, T = minnormpertmat.shape
+        # assert N < T
+        fragilitymat = np.zeros((N, T))
+        for icol in range(T):
+            fragilitymat[:, icol] = (np.max(minnormpertmat[:, icol]) - minnormpertmat[:, icol]) / \
+                                    np.max(minnormpertmat[:, icol])
+        return fragilitymat
+
+    @staticmethod
+    def compute_minmaxfragilitymetric(minnormpertmat):
+        # get dimensions of the pert matrix
+        N, T = minnormpertmat.shape
+        # assert N < T
+        minmax_fragilitymat = np.zeros((N, T))
+
+        # get the min/max for each column in matrix
+        minacrosstime = np.min(minnormpertmat, axis=0)
+        maxacrosstime = np.max(minnormpertmat, axis=0)
+
+        # normalized data with minmax scaling
+        minmax_fragilitymat = -1 * np.true_divide((minnormpertmat - nmb.repmat(maxacrosstime, N, 1)),
+                                                  nmb.repmat(maxacrosstime - minacrosstime, N, 1))
+        return minmax_fragilitymat
+
+    @staticmethod
+    def compute_znormalized_fragilitymetric(minnormpertmat):
+        # get mean, std
+        avg_contacts = np.mean(minnormpertmat, keepdims=True, axis=1)
+        std_contacts = np.std(minnormpertmat, keepdims=True, axis=1)
+
+        # normalized data with minmax scaling
+        return (minnormpertmat - avg_contacts) / std_contacts
 
 
 class ImpulseResponse(object):
@@ -31,13 +77,18 @@ class ImpulseModel():
         else:
             self.rangefunc = range
 
-    def apply_impulse_lti(self, adjmat, magnitude, N=None, dt=None):
+    def apply_impulse_lti(self, adjmat, magnitude=1.0,
+                          N=None, dt=None, stabilize=False):
         if N is None:
             N = self.N
         if dt is None:
             dt = self.dt
 
         A = adjmat
+
+        if stabilize:
+            A = self._stabilize_matrix(A, m=1.0)
+
         numchans, _ = adjmat.shape
 
         impulse_responses = []
@@ -56,21 +107,17 @@ class ImpulseModel():
             system = scipy.signal.StateSpace(A, B, C, D, dt=dt)
 
             # computes impulse response of the dtlti system
-            # x0 = 0
-            time, y = system.impulse(x0=None, t=None, n=N)
+            x0 = 0
+            time, y = system.impulse(x0=x0, t=None, n=N)
 
             # get the result in array form (NxC)
             y = y[0]
 
+            # print(y.shape)
             # transpose to become CxN
             y = y.T
 
-            # only get the index we care about (Nx1)
-            # y = y[:, j]
-            # y = ImpulseResponse(y[0])  # extract the tuple
-
             # actually append the impulse responses
-            # print(y.shape)
             impulse_responses.append(y)
 
         return np.array(impulse_responses)
@@ -100,7 +147,7 @@ class ImpulseModel():
                 #     print("Stabilizing matrix! {} to eigenvalue {}".format(adjmat.shape, 1.0))
 
             # if i == 0:
-                # print(adjmat.shape)
+            # print(adjmat.shape)
 
             # apply impulse to this lti model
             impulse_responses = self.apply_impulse_lti(

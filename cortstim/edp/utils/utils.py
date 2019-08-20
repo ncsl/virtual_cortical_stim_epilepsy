@@ -16,8 +16,8 @@ import numpy.matlib as nmb
 import pandas as pd
 import re
 
-from eztrack.base.utils.data_structures_utils import NumpyEncoder
-from eztrack.base.utils.data_structures_utils import ensure_list
+from cortstim.base.utils.data_structures_utils import NumpyEncoder
+from cortstim.base.utils.data_structures_utils import ensure_list
 
 import scipy.io as sio
 import scipy
